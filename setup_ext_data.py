@@ -1,24 +1,11 @@
 import glob
 import os
 import subprocess
-import warnings
 
 from astropy.io import fits
 import matplotlib.pyplot as plt
 
 from read_data import DATstarname
-#from read_data import get_model_data
-
-#from plot_extinction_curves import plot_data_model
-#from plot_extinction_curves import ext_fit_plot
-
-#from measure_extinction.stardata import StarData
-#from measure_extinction.extdata import ExtData
-#from measure_extinction.utils.fit_model import FitInfo
-#from astropy.modeling.fitting import LevMarLSQFitter, FittingWithOutlierRemoval
-
-#from measure_extinction.utils.fit_model import get_best_fit_params, get_percentile_params
-#from astropy.table import QTable
 
 def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
     dirs = outpath.split('/')
@@ -26,7 +13,7 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
     datpath = '/'.join(dirs)
     dstarname = DATstarname(starname)
     fstarname = f"{dstarname}.dat"
-    
+
     fits_file_path = glob.glob(outpath+"{}*{}.fits".format(starname,waveregion))
     fits_filename = fits_file_path[0].split('/')[-1]
     get_band_name = fits_filename.replace(starname+'_', '')
@@ -36,12 +23,12 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
     band_name = '_'.join(band_name)
 
     star = ""
-    if sample_summary == "fitzpatrick_2019_stars.dat":
+    if sample_summary == "F19":
         f19_path = outpath.split('/')[:-3]
         f19_path = '/'.join(f19_path)+'/'
         pstarname = get_f19starname(starname)
     
-        with open(file_path+sample_summary, "r") as f:
+        with open(f"{file_path}fitzpatrick_2019_stars.dat", "r") as f:
             while not star.startswith(pstarname):
                 star = f.readline()
                 if star.startswith("# source"):
@@ -49,9 +36,9 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
                     return 
 
         if star.split()[-5].startswith("B") or star.split()[-5].startswith("O"):
-            f19sptype = "sptype = " + "".join(star.split()[-5:-3]) + " ; ref = 2019ApJ...886..108F\n"
+            sptype = "sptype = " + "".join(star.split()[-5:-3]) + " ; ref = 2019ApJ...886..108F\n"
         elif star.split()[-4].startswith("B") or star.split()[-4].startswith("O"):
-            f19sptype = "sptype = " + star.split()[-4] + " ; ref = 2019ApJ...886..108F\n"
+            sptype = "sptype = " + star.split()[-4] + " ; ref = 2019ApJ...886..108F\n"
 
     try:
         with open(datpath+fstarname) as datfile:
@@ -60,14 +47,14 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
         index = [idx for idx, s in enumerate(f) if 'sptype' in s]
         if index == []:
             sptype = ""
-        if sample_summary == "fitzpatrick_2019_stars.dat" and "···" in star.split()[-5:-3]:
+        if sample_summary == "F19" and "···" in star.split()[-5:-3]:
             sptype = f[index[0]]
                 
     except FileNotFoundError:
         print("Oops .dat file for {} not found. \nCreating new {}.dat file.".format(dstarname, dstarname))
 
         sptype_placeholder = "sptype = \n"
-        if sample_summary == "fitzpatrick_2019_stars.dat" and "···" in star.split()[-5:-3]:
+        if sample_summary == "F19" and "···" in star.split()[-5:-3]:
             print("Oops! Please manually enter star spectral type from SIMBAD.")
             sptype = sptype_placeholder
 
@@ -88,7 +75,7 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
             index = [idx for idx, s in enumerate(f) if 'fits' in s][0]
         except IndexError:
             index = -1
-        if sample_summary == "fitzpatrick_2019_stars.dat": 
+        if sample_summary == "F19":
             stis_path = 'STIS_Data/'+f'{starname}_stis_Opt.fits'
         else:
             stis_path = "STIS_Data/"+fits_filename
@@ -96,7 +83,7 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
 
     for i,line in enumerate(f):
         line = line.split(' ')
-        if sample_summary == "fitzpatrick_2019_stars.dat" and line[0] == 'sptype':
+        if sample_summary == "F19" and line[0] == 'sptype':
             f[i] = sptype
 
         # Comment out any data types that are not needed
@@ -114,9 +101,9 @@ def mrg2fits(starname, inpath, outpath, waveregion="Opt", outstarname=None):
     # Running the command line command:
     # python3 merge_stis_spec.py --ralph --inpath=[inpath] --outpath=[outpath] [starname]
     
-    command_args = ["python3",'-W ignore', "merge_stis_spec.py",'--inpath='+inpath,'--outpath='+outpath,'--png'] 
+    command_args = ["python3",'-W ignore', "merge_stis_spec.py",'--inpath='+inpath,'--outpath='+outpath,'--png']
 
-    if data_set == "fitzpatrick_2019_stars.dat": command_args.append("--ralph")
+    if data_set == "F19": command_args.append("--ralph")
     if outstarname != None: command_args.append('--outname='+outstarname)
     command_args.append('--waveregion='+waveregion)
     command_args.append(starname)
@@ -205,15 +192,15 @@ def get_stars_list(file_path, data_set, starname_col = 0):
 ############################################
 
 file_path = "/Users/cgunasekera/extstar_data/"
-data_set = "HighLowRv"
+data_set = "F19"
 # OPTIONS:
-#   "fitzpatrick_2019_stars.dat"
-#   "HighLowRv_HST.dat"
+#   "F19"
+#   "HighLowRv"
 
-inpath = f"{file_path}DAT_files/STIS_Data/HighLowRv_Orig/" #location of original reduced data, *.mrg files
+inpath = f"{file_path}DAT_files/STIS_Data/F19_Orig/Opt/" #location of original reduced data, *.mrg files
 # OPTIONS:
-#   F19 STIS:   "DAT_files/STIS_Data/Orig/Opt/"
-#   HighLowRv:  "DAT_files/HighLowRv_Orig/"
+#   F19 STIS:   "DAT_files/STIS_Data/F19_Orig/Opt/"
+#   HighLowRv:  "DAT_files/STIS_Data/HighLowRv_Orig/"
 
 outpath = f"{file_path}DAT_files/STIS_Data/" #location of files to output, *.fits files
 
@@ -241,14 +228,19 @@ if __name__ == "__main__":
 
     if data_set == "F19":
         for starname in stars_list:
+            #if not starname == "hd210121":
+            #    continue
             print("Creating STIS .fits file for ", starname)
             mrg2fits(starname, inpath, outpath)
+            i+=1
     
     elif data_set == "HighLowRv":
         outstarname = get_stars_list(file_path=file_path, data_set=data_set, starname_col=1)
         for (current_dir, dirs, files) in os.walk(inpath, topdown = 'true'):
             i=0
             merged_stars = []
+            if current_dir != inpath:
+                continue
             for file in files:
                 if file.endswith(".fits") and file[:6] not in merged_stars:
                     merged_stars.append(file[:6])
@@ -256,8 +248,8 @@ if __name__ == "__main__":
                     starname = hdul[0].header["TARGNAME"]
                     file_name = file.split("_")[0]
 
-                    #if not starname.endswith("37023"):#starname == "ALS8351": 
-                    #    continue
+                    if not starname == "ALS882": #starname.endswith("37023"):
+                        continue
 
                     optical_element = hdul[0].header["OPT_ELEM"]
 
@@ -274,6 +266,13 @@ if __name__ == "__main__":
                         mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname=f"{outstarname[index]}")
                         mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname=f"{outstarname[index]}")
                         i+=1
-                    #if starname.endswith("37023"):#starname == "ALS8351": 
-                    #    break
+                    elif starname.lower() == "ngc2264-vas47":
+                        mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="walker67")
+                        mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="walker67")
+                        i+=1
+                    elif starname.lower() == "hd200775":# or starname.lower() == "ngc2264-vas47":
+                        mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="hd200775")
+                        mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="hd200775")
+                        i+=1
+
     print(f"{i} stars fits files done.")
