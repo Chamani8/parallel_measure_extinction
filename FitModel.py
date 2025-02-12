@@ -18,10 +18,14 @@ def FitModel(starname,
          picmodel=True, #Set to read model grid from pickle file
          mcmc=False, #run EMCEE MCMC fitting
          mcmc_nsteps=1000, #number of MCMC steps
+         savepath=None,
          showfit=False, #display the best fit model plot
          png=False, #save plots as png instead of pdf
+         exregions=[]
         ):
-    
+
+    if savepath == None: savepath=path
+
     outname = f"{starname}_mefit"
     if png:
         outtype = "png"
@@ -94,7 +98,41 @@ def FitModel(starname,
     minutes = f"{int(minutes)} minutes, " if minutes > 0 else ""
     print(f"Models pickled to {modstr}_modinfo.pkl, {hours}{minutes}{int(seconds)} seconds".strip())
 
-    # setup the model
+    start_time = time.time()
+    print("Start fitting")
+
+    fitmod, result = FitModel_opt(reddened_star, modinfo, modtype, wind)
+
+    seconds = time.time() - start_time
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    hours = f"{int(hours)} hours, " if hours > 0 else ""
+    minutes = f"{int(minutes)} minutes, " if minutes > 0 else ""
+    print(f"Finished fitting, took {hours}{minutes}{int(seconds)} seconds".strip())
+
+    print(result["message"])
+    if not result["message"].endswith("successfully."):
+        # check the fit output
+        return
+
+    print("best parameters")
+    fitmod.pprint_parameters()
+
+    os.chdir(savepath)
+    fitmod.plot(reddened_star, modinfo)
+    plt.savefig(f"{savepath}{outname}_minimizer.{outtype}")
+    print(f"Saved optimizer fit in: {savepath}{outname}_minimizer.{outtype}")
+    plt.close()
+
+    if mcmc:
+        fitmod = FitModel_mcmc(fitmod, reddened_star, modinfo, mcmc_nsteps, outname, outtype)
+
+    if showfit:
+        fitmod.plot(reddened_star, modinfo)
+        plt.show()
+
+def FitModel_opt(reddened_star, modinfo, modtype, wind):
+        # setup the model
     # memod = MEModel(modinfo=modinfo, obsdata=reddened_star)  # use to activate logf fitting
     print("Running MEModel")
     memod = MEModel(modinfo=modinfo)
@@ -132,64 +170,50 @@ def FitModel(starname,
     print("Initial parameters")
     memod.pprint_parameters()
 
-    start_time = time.time()
-    print("Start fitting")
-
     fitmod, result = memod.fit_minimizer(reddened_star, modinfo, maxiter=10000)
 
-    seconds = time.time() - start_time
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    hours = f"{int(hours)} hours, " if hours > 0 else ""
-    minutes = f"{int(minutes)} minutes, " if minutes > 0 else ""
-    print(f"Finished fitting, took {hours}{minutes}{int(seconds)} seconds".strip())
+    return fitmod, result
 
-    print(result["message"])   
-    if not result["message"].endswith("successfully."):
-        # check the fit output
-        return
-
-    print("best parameters")
-    fitmod.pprint_parameters()
-
-    fitmod.plot(reddened_star, modinfo)
-    plt.savefig(f"{outname}_minimizer.{outtype}")
-    plt.close()
-
-    if mcmc:
-        print("starting sampling")
+def FitModel_mcmc(fitmod,
+                  reddened_star,
+                  modinfo,
+                  mcmc_nsteps,
+                  outname,
+                  outtype
+                  ):
+        print("Starting MCMC sampling")
         # using an MCMC sampler to define nD probability function
         # use best fit result as the starting point
         fitmod2, flat_samples, sampler = fitmod.fit_sampler(
             reddened_star,
             modinfo,
-            nsteps=mcmc_nsteps,
-        )
+            nsteps=mcmc_nsteps)
 
-        print("finished sampling")
+        print("Finished MCMC sampling")
 
         print("p50 parameters")
         fitmod2.pprint_parameters()
 
         fitmod2.plot(reddened_star, modinfo)
         plt.savefig(f"{outname}_mcmc.{outtype}")
+        print(f"Saved mcmc fit in: {outname}_minimizer.{outtype}")
         plt.close()
 
         fitmod2.plot_sampler_chains(sampler)
         plt.savefig(f"{outname}_mcmc_chains.{outtype}")
+        print(f"Saved mcmc sampler chians in: {outname}_minimizer.{outtype}")
         plt.close()
 
         fitmod2.plot_sampler_corner(flat_samples)
         plt.savefig(f"{outname}_mcmc_corner.{outtype}")
+        print(f"Saved mcmc sampler corner plots in: {outname}_minimizer.{outtype}")
         plt.close()
 
-        fitmod = fitmod2
+        return fitmod2
 
-    if showfit:
-        fitmod.plot(reddened_star, modinfo)
-        plt.show()
 
 if __name__ == "__main__":
     starname = "csi-27-07550"
     path = "/Users/cgunasekera/extstar_data/DAT_files"
-    FitModel(starname.lower(), path, modpath="/Users/cgunasekera/extstar_data/Models", showfit=True)
+    FitModel(starname.lower(), path, modpath="/Users/cgunasekera/extstar_data/Models",
+             showfit=True, savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots")
