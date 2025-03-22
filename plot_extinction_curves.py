@@ -13,7 +13,7 @@ import astropy.units as u
 from read_data import DATstarname
 from read_data import get_model_data
 from read_data import get_mask
-from setup_ext_data import get_stars_list
+from read_data import get_fit_band
 
 from measure_extinction.stardata import StarData
 from measure_extinction.extdata import ExtData
@@ -160,7 +160,7 @@ def plot_residual(ax, reddened_star, modinfo, params, fit_range="g23", velocity=
     ax.tick_params("both", length=5, width=1, which="minor")
     
 
-def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0, plot_title=""):
+def plot_data_model(reddened_star_fitband, reddened_star, modinfo, params, fit_range="g23", velocity=0, plot_title=""):
     # plotting setup for easier to read plots
     fontsize = 18
     font = {"size": fontsize}
@@ -184,7 +184,7 @@ def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0,
 
     # plot the bands and all spectra for this star
     #TODO: add an assert that band_data is in the star.data.keys()
-    for cspec in modinfo.fluxes.keys():
+    for i,cspec in enumerate(modinfo.fluxes.keys()):
         if cspec == "BAND":
             ptype = "o"
         else:
@@ -195,12 +195,19 @@ def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0,
         # ax.plot(reddened_star.data[cspec].waves,
         #        weights[cspec], 'k-')
 
-        ax[0].plot(
-            reddened_star.data[cspec].waves,
-            reddened_star.data[cspec].fluxes,
-            "k" + ptype,
-            label="data",
-        )
+        if i == 0:
+            ax[0].plot(
+                reddened_star.data[cspec].waves,
+                reddened_star.data[cspec].fluxes,
+                "k" + ptype,
+                label="data",
+            )
+        else:
+            ax[0].plot(
+                reddened_star.data[cspec].waves,
+                reddened_star.data[cspec].fluxes,
+                "k" + ptype,
+            )
     
     # intrinsic sed
     modsed = modinfo.stellar_sed(params[0:3], velocity=velocity)
@@ -213,33 +220,48 @@ def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0,
         params[10:12], [velocity, 0.0], ext_modsed
     )
     
-    for cspec in modinfo.fluxes.keys():
+    for j,cspec in enumerate(modinfo.fluxes.keys()):
         if cspec == "BAND":
             ptype = "o"
         else:
             ptype = "-"
 
-        mask = get_mask(reddened_star.data[cspec].fluxes)
-        reddened_star.data[cspec].fluxes[mask] = np.nan
+        mask = get_mask(reddened_star_fitband.data[cspec].fluxes)
+        reddened_star_fitband.data[cspec].fluxes[mask] = np.nan
 
         norm_model = np.average(hi_ext_modsed["BAND"])
-        norm_data = np.average(reddened_star.data["BAND"].fluxes).value
+        norm_data = np.average(reddened_star_fitband.data["BAND"].fluxes).value
 
-        ax[0].plot(
-            modinfo.waves[cspec], modsed[cspec] * norm_data / norm_model, "b" + ptype, label=cspec+", Intrinic Model SED w/o dust"
-        )
-        ax[0].plot(
-            modinfo.waves[cspec],
-            ext_modsed[cspec] * norm_data / norm_model,
-            "r" + ptype,
-            label=cspec,
-        )
-        ax[0].plot(
-            modinfo.waves[cspec],
-            hi_ext_modsed[cspec] * norm_data / norm_model,
-            "g" + ptype,
-            label=cspec+"final best fit model w/ dust",
-        )
+        if j == 0:
+            ax[0].plot(
+                modinfo.waves[cspec], modsed[cspec] * norm_data / norm_model, "b" + ptype, label=cspec+", Intrinic Model SED w/o dust"
+            )
+            ax[0].plot(
+                modinfo.waves[cspec],
+                ext_modsed[cspec] * norm_data / norm_model,
+                "r" + ptype,
+                label=cspec,
+            )
+            ax[0].plot(
+                modinfo.waves[cspec],
+                hi_ext_modsed[cspec] * norm_data / norm_model,
+                "g" + ptype,
+                label=cspec+"final best fit model w/ dust",
+            )
+        else:
+            ax[0].plot(
+                modinfo.waves[cspec], modsed[cspec] * norm_data / norm_model, "b" + ptype
+            )
+            ax[0].plot(
+                modinfo.waves[cspec],
+                ext_modsed[cspec] * norm_data / norm_model,
+                "r" + ptype
+            )
+            ax[0].plot(
+                modinfo.waves[cspec],
+                hi_ext_modsed[cspec] * norm_data / norm_model,
+                "g" + ptype
+            )
 
         if cspec == "STIS_Opt":
             #annotation_fontsize = 
@@ -284,7 +306,7 @@ def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0,
                         horizontalalignment='center'
                         )
 
-    plot_residual(ax[1], reddened_star, modinfo, params, fit_range=fit_range, velocity=velocity, plot_title="Initial guess, Optimizer Fit")
+    plot_residual(ax[1], reddened_star_fitband, modinfo, params, fit_range=fit_range, velocity=velocity, plot_title="Initial guess, Optimizer Fit")
     
     # finish configuring the plot
     a1 = np.array(hi_ext_modsed[cspec] * norm_data / norm_model)
@@ -296,7 +318,7 @@ def plot_data_model(reddened_star, modinfo, params, fit_range="g23", velocity=0,
     ymax = max(b)
     ymin = min(min(a1),min(a2))
 
-    ax[0].set_ylim(1e-15, ymax*1.1) #8e5 * norm_data / norm_model, 2e8 * norm_data / norm_model)
+    ax[0].set_ylim(0, ymax*1.1) #8e5 * norm_data / norm_model, 2e8 * norm_data / norm_model)
     ax[1].set_ylim(-10,10)
     #ax[0].set_xlim(0.29,1.4)
     ax[0].set_yscale("log")
@@ -323,20 +345,26 @@ def plot_sed(data_set, show_plot=True, save_plot=False, save_prefix="optimizer")
     params = read_fit_params(starname,data_set=data_set)
 
     #Read in the star data
-    reddened_star = StarData(fstarname, path=f"{file_path}DAT_files/", only_bands="J")
-    band_names = reddened_star.data["BAND"].get_band_names()
-    data_names = reddened_star.data.keys()
+    reddened_star = StarData(fstarname, path=f"{file_path}DAT_files/")
+
+    #Following is needed to normalize model data with reddened star data,
+    #check which photo band is used in the fitting in read_data:71
+    fit_band = "J"
+    reddened_star_J = StarData(fstarname, path=f"{file_path}DAT_files/", only_bands="J")
+    band_names = reddened_star_J.data["BAND"].get_band_names()
+    data_names = reddened_star_J.data.keys()
     modinfo = get_model_data(file_path, data_names, logTeff=params[0], logg=params[1],
                              band_names=band_names[0])
 
-    plot_data_model(reddened_star, modinfo, params, fit_range=fit_range, velocity=velocity, plot_title="Initial guess, Optimizer Fit")
-    if show_plot: plt.show()
-    if save_plot: 
+    plot_data_model(reddened_star_J, reddened_star, modinfo, params, fit_range=fit_range, velocity=velocity, plot_title="Initial guess, Optimizer Fit")
+    #if show_plot: plt.show()
+    if save_plot:
         save_prefix = f"{save_prefix}_{datetime.today().strftime('%Y-%m-%d')}"
         plt.savefig(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/plots/{starname}_{list(data_names)[1]}_{save_prefix}.png")
 
-
-#############
+##################################
+# EXTINCTION FIT AND PLOT BELOW  #
+##################################
 
 def plot_resid(ax, data, dindx, model, color, dataname):
     """
@@ -372,7 +400,6 @@ def fit_ext_curve(model, data, wrange, dataname): #, no_weights=False):
     Do the fits and plot the fits and residuals
     """
     warnings.filterwarnings("ignore")
-
     models = {}
     models["g22opt"] = (
             Polynomial1D(4)
@@ -417,6 +444,26 @@ def fit_ext_curve(model, data, wrange, dataname): #, no_weights=False):
         intercepts = intercepts[sindxs]
         intercepts_unc = intercepts_unc[sindxs]
 
+        ## Exclude bad regions of the data:
+        ex_regions = [
+        [8.23 - 0.1, 8.23 + 0.1],  # geocoronal line
+        [8.7, 10.0],  # bad data from STIS
+        [3.55, 3.6],
+        [3.80, 3.90],
+        [4.15, 4.3],
+        [6.4, 6.6],
+        [7.1, 7.3],
+        [7.45, 7.55],
+        [7.65, 7.75],
+        [7.9, 7.95],
+        [8.05, 8.1],
+        ] #/ u.micron
+
+        for k, wave in enumerate(waves):
+            for cexreg in ex_regions:
+                if wave.value >= cexreg[0] and wave.value <= cexreg[1]:
+                    npts[k] = 0
+
         gvals = (npts > 0) & (waves.value >= wrange[0]) & (waves.value <= wrange[1])
 
         fit = LevMarLSQFitter()
@@ -434,12 +481,15 @@ def fit_ext_curve(model, data, wrange, dataname): #, no_weights=False):
 
 
 def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
+
+    if extdata.type != "alav" or extdata.type != "alax":
+        extdata.trans_elv_alav() #Transform E(lambda-V) to A(lambda)/A(V)
+
     if plot_data_type == None:
         plot_data_type = extdata.waves.keys()
-    
     models = []
     xrange = [0.,0.]
-    if "STIS" in plot_data_type:
+    if "STIS"  in plot_data_type or "IUE" in plot_data_type:
         models.append("fm90")
         xrange = [0.1, 0.3]
     
@@ -458,7 +508,7 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
             dataname=plot_data_type
             #no_weights=True, 
             )
-    
+
     # Setup plot
     fontsize = 16
     font = {"size": fontsize}
@@ -487,7 +537,9 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
 
     for i,cspec in enumerate(plot_data_type):
         if cspec == "BAND":
-            continue
+            ptype = "o"
+        else:
+            ptype = "-"
         npts = extdata.npts[cspec]
         waves = extdata.waves[cspec]
         intercepts = extdata.exts[cspec]
@@ -501,23 +553,24 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
 
         #flat_mask = [np.array(list(mask[cspec]), dtype=bool) for cspec in mask.keys()]
         #mask = np.concatenate(flat_mask)
-        filtered_data = np.ma.masked_array(intercepts[gvals], mask=~mask[cspec])
-        if i == 1:
-            ax[0].plot(waves, intercepts, linewidth=1, color = "darkslategrey", label = "data")#, alpha=0.75)
-            ax[0].plot(waves[gvals], cmodelfit[cspec](fitx), color="k", alpha=0.5, label = "model")
-            ax[0].plot(waves[gvals], filtered_data, rejsym, label="rejected")
+        if cspec!="BAND": filtered_data = np.ma.masked_array(intercepts[gvals], mask=~mask[cspec])
+        if i == 1 or cspec == "BAND":
+            ax[0].plot(waves, intercepts, "k"+ptype, linewidth=1, label = "data")#, alpha=0.75)
+            if cspec!="BAND":
+                ax[0].plot(waves[gvals], cmodelfit[cspec](fitx), "k"+ptype, alpha=0.5, label = "model")
+                ax[0].plot(waves[gvals], filtered_data, rejsym, label="rejected")
         else:
-            ax[0].plot(waves, intercepts, linewidth=1, color = "darkslategrey")#, alpha=0.75)
-            ax[0].plot(waves[gvals], cmodelfit[cspec](fitx), color="k", alpha=0.5)
-            ax[0].plot(waves[gvals], filtered_data, rejsym)
+            ax[0].plot(waves, intercepts, "k"+ptype, linewidth=1)#, alpha=0.75)
+            if cspec!="BAND":
+                ax[0].plot(waves[gvals], cmodelfit[cspec](fitx), "k"+ptype, alpha=0.5)
+                ax[0].plot(waves[gvals], filtered_data, rejsym)
     
-        filtered_data2 = np.ma.masked_array(
-            intercepts[gvals] - cmodelfit[cspec](fitx), mask=~mask[cspec]
-        )
-        if i == 1: ax[1].plot(waves[gvals], filtered_data2, rejsym, label="rejected")
-        else: ax[1].plot(waves[gvals], filtered_data2, rejsym)
+        if cspec!="BAND":
+            filtered_data2 = np.ma.masked_array(intercepts[gvals] - cmodelfit[cspec](fitx), mask=~mask[cspec])
+            if i == 1: ax[1].plot(waves[gvals], filtered_data2, rejsym, label="rejected")
+            else: ax[1].plot(waves[gvals], filtered_data2, rejsym)
 
-        if cspec == "STIS":
+        if cspec == "STIS" or cspec == "IUE":
             fitted_models = [cmodelfit[cspec]]
             # plotting the components
             modx = np.linspace(0.09, 0.33, 100) * u.micron
@@ -547,10 +600,9 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
                     alpha=0.5, 
                     label = f"4D Poly. + $\lambda=${fitted_models[0][k + 1].x_0.value} Drude"
                 )
-        else:
+        elif cspec != "BAND":
             print("Oops! Write needed model fits for missing models here.")
 
-    
     leg_loc = "upper right"    
     ax[0].legend(ncol=2, loc=leg_loc, fontsize=0.8 * fontsize)
     yrange_a_type = "linear"
@@ -560,7 +612,7 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
     xticks = [0.3, 0.35, 0.45, 0.55, 0.7, 0.9, 1.0]
 
     ax[1].set_xscale("log")
-    ax[1].set_xlim(xrange[0], xrange[1])
+    ax[1].set_xlim(xrange[0], 2.0)#xrange[1])
     ax[1].set_xlabel(r"$\lambda$ [$\mu$m]")
 
     ax[0].set_yscale("linear")
@@ -589,28 +641,30 @@ def ext_fit_plot(extdata, plot_title=None, plot_data_type=None, xrange=None):
         plot_Hlines(ax[1])
         plot_ISSfeatures(ax[1])
 
-
-def plot_ext(data_set,show_plot=True, save_plot=False):
-    file = f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/{starname}_ext_optimizer.fits"
+def plot_ext(data_set, fit_type="optimizer", show_plot=False, save_plot=False):
+    if not fit_type == "":
+        fit_type = f"_{fit_type}"
+    file = f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/gun25_{starname}_ext{fit_type}.fits" #gun25_"+starname+mcmc_save_prefix+"_ext.fits"
 
     # Read the calculated extinction curve as an ExtData object 
-    fit19_stis = ExtData(file)
+    extdata = ExtData(file)
 
     # Fit and plot the extinction curve read above
-    fit19_stis.calc_AV()
-    fit19_stis.calc_RV()
-    RV = fit19_stis.columns["RV"]
-    AV = fit19_stis.columns["AV"]
-    print(AV, RV[0], RV[1])
+    extdata.calc_AV_JHK()
+    extdata.calc_RV()
+
+    RV = extdata.columns["RV"]
+    AV = extdata.columns["AV"]
+
+    print(f"extdata type: {extdata.type}")
+    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
+
     print("Plotting Extinction of ", starname)
-    ext_fit_plot(fit19_stis, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
+    ext_fit_plot(extdata, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
 
     # Show or save extinction plot
-    save_prefix = ""
-    fname = f"stis_opt_fit_ext_{starname}_{save_prefix}"
-    if save_plot: plt.savefig(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/plots/{fname}.png")
+    if save_plot: plt.savefig(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/plots/{starname}_ext_fit.png")
     if show_plot: plt.show()
-
 
 def plot_Hlines(ax, y_loc=None, color="grey", linestyle="--", linewidth=1):
     H_line_waves = [0.3645, 0.8204, 0.656281, 0.4861, 0.4340]
@@ -687,8 +741,7 @@ def plot_ISSfeatures(ax,
         i+=0.02
 
 
-
-def plot_avg1(data_set,dataname='STIS_Opt'):
+def plot_avg(data_set,dataname='STIS_Opt'):
     ext_waves_all = {}
     ext_resid_all = {}
     old_waves = np.array([0.0,0.0,0.0])
@@ -697,9 +750,8 @@ def plot_avg1(data_set,dataname='STIS_Opt'):
     if dataname == "STIS_Opt": xrange = [0.30, 1.0]
 
     for star in lstarname:
-        fit19_stis = QTable.read(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/{star}_ext_optimizer.fits", hdu=2)
-
-        file = f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/{star}_ext_optimizer.fits"
+        #extdata = QTable.read(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/gun25_{star}_ext_optimizer.fits", hdu=2)
+        file = f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/gun25_{star}_ext_optimizer.fits"
         fit19_extdata = ExtData(file)
 
         cmodelfit, mask = fit_ext_curve(
@@ -771,38 +823,12 @@ def plot_avg1(data_set,dataname='STIS_Opt'):
     ax.set_title(f"Averaged Residuals for {len(lstarname)} Stars")
     ax.legend(loc="upper right")
     
-    plt.show()
+    #plt.show()
 
     fname = "stis_opt_ext_averaged_residuals"
     fig.savefig(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/plots/{fname}.png")
 
-    #print(df_waves)
-    #print(df_resid)
     #ext_fit_plot(file_path+"DAT_files/STIS_Data/fitting_results/{data_set}/", starname+"_ext_optimizer"+".fits", show_plot=show_plot, save_plot=False)
-
-def plot_avg2(data_set,show_plot=True, save_plot=False):
-    lstar_extdata = []
-    for star in lstarname:
-        extinc_data = ExtData(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/{star}_ext_optimizer.fits")
-        params = read_fit_params(star,data_set=data_set)
-        
-        extinc_data.columns["AV"] = (params[3], 0.0)
-        extinc_data.trans_elv_alav()
-        lstar_extdata.append(extinc_data)
-    
-    warnings.filterwarnings("ignore")
-    avg_extdata = AverageExtData(lstar_extdata)
-
-    print("Plotting Averaged Extinction")
-    ext_fit_plot(avg_extdata, plot_title=f"Averaged Extinction for {len(lstarname)} Stars")
-
-    # Show or save extinction plot
-    save_prefix = ""
-    fname = f"stis_opt_avg_fit_ext_{starname}_{save_prefix}"
-    
-    if save_plot: plt.savefig(f"{file_path}DAT_files/STIS_Data/fitting_results/{data_set}/plots/{fname}.png")
-    if show_plot: plt.show()
-
 
 
 
@@ -813,7 +839,7 @@ def plot_avg2(data_set,show_plot=True, save_plot=False):
 
 #TODO make into user command line input
 data_set = "HighLowRv"
-starname = "csi-27-07550"
+starname = "als882"
 
 lstarname = ["hd46106",
              "hd18352",
@@ -824,7 +850,7 @@ lstarname = ["hd46106",
              "hd14250",
              "hd92044"]
 
-to_execute = "Plot sed" # "Plot extinction", "Plot sed", "Plot average"
+to_execute = "Stacked sed" # "Plot extinction", "Plot sed", "Plot average", "Stacked sed"
 
 save_prefix = ""
 file_path = "/Users/cgunasekera/extstar_data/"
@@ -848,16 +874,17 @@ else:
 ###########################################
 
 if __name__ == "__main__":
-    if to_execute.upper().split()[-1].startswith("SED"):
-        plot_sed(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
 
-    elif (to_execute.upper()).split()[-1].startswith("EXT"):
-        plot_ext(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
-    
-    elif (to_execute.upper()).split()[-1].startswith("BOTH"):
-        plot_sed(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
-        plot_ext(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
+    if to_execute.upper().split()[0].startswith("PLOT"):
+        if to_execute.upper().split()[-1].startswith("SED"):
+            plot_sed(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
 
-    elif (to_execute.upper()).split()[-1].startswith("AVE"):
-        plot_avg1(data_set=data_set, show_plot=show_plot, save_plot=save_plot) # average of residuals
-        #plot_avg2(data_set) # average of extinction A(lambda) / A(V)
+        elif (to_execute.upper()).split()[-1].startswith("EXT"):
+            plot_ext(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
+
+        elif (to_execute.upper()).split()[-1].startswith("BOTH"):
+            plot_sed(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
+            plot_ext(data_set=data_set, show_plot=show_plot, save_plot=save_plot)
+
+        elif (to_execute.upper()).split()[-1].startswith("AVE"):
+            plot_avg(data_set=data_set, show_plot=show_plot, save_plot=save_plot) # average of residuals
