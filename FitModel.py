@@ -15,7 +15,7 @@ from measure_extinction.extdata import ExtData
 
 from setup_ext_data import get_stars_list
 
-from plot_extinction_curves import ext_fit_plot
+from plot_extinction_curves import plot_ext
 
 def get_modeldata(reddened_star,
          modtype="obsstars",
@@ -91,29 +91,20 @@ def Save_params(fitmod, starname, save_path, fit_type):
     f.write(f"# {starname} best fit params\n")
 
     pnames = [
-        ["logTeff", "logg", "logZ", "vturb", "velocity", "windamp", "windalpha"],
-        ["Av", "Rv", "C2", "B3", "C4", "xo", "gamma"],
-        ["vel_MW", "logHI_MW", "vel_exgal", "logHI_exgal"],
+        "logTeff", "logg", "logZ", "vturb", "velocity", "windamp", "windalpha",
+        "Av", "Rv", "C2", "B3", "C4", "xo", "gamma",
+        "vel_MW", "logHI_MW", "vel_exgal", "logHI_exgal"
     ]
-    for cnames in pnames:
-        hline = ""
-        tline = ""
-        for cname in cnames:
-            if getattr(fitmod, cname).fixed:
-                fstr = "F"
-            else:
-                fstr = ""
-            hline = f"{cname} "
-            tline = f"{getattr(fitmod, cname).value:f}{fstr}"
-            f.write(f"{getattr(fitmod, cname).value:f}{fstr} #{cname}\n")
 
-    if hasattr(fitmod, "logf"):
-        hline = "logf: "
-        tline = ""
-        for cname in fitmod.logf.keys():
-            hline += f"{cname} "
-            tline += f"{fitmod.logf[cname]:f}"
-            f.write(f"{getattr(fitmod, cname).value:f}{fstr} #{cname}\n")
+    for cname in fitmod.paramnames:
+        param = getattr(fitmod, cname)
+        if (cname != "norm"):
+            if param.unc is not None:
+                ptxt = rf"${param.value:f} \pm {param.unc:f}$ #{cname}\n"
+            else:
+                ptxt = f"{param.value:f} #{cname}\n"
+            
+            f.write(ptxt)
     f.close()
 
 def FitModel(starname,
@@ -163,6 +154,13 @@ def FitModel(starname,
             if abs(val - reddened_star.data[cspec].fluxes[i-1].value)/val > allowed_dev and abs(val - reddened_star.data[cspec].fluxes[i+1].value)/val > allowed_dev:
                 reddened_star.data[cspec].fluxes.value[i] = np.nan
 
+            if starname=="bd+56-510":
+                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value<0.292:
+                    reddened_star.data[cspec].fluxes.value[i] = np.nan
+                if cspec == "IUE" and reddened_star.data[cspec].waves[i].value>0.3153:
+                    reddened_star.data[cspec].fluxes.value[i] = np.nan
+                if reddened_star.data[cspec].waves[i].value>0.2186 and reddened_star.data[cspec].waves[i].value<0.2197:
+                    reddened_star.data[cspec].fluxes.value[i] = np.nan
             if starname=="als18098":
                 if reddened_star.data[cspec].waves[i].value>0.18092 and reddened_star.data[cspec].waves[i].value<0.18164:
                     reddened_star.data[cspec].fluxes.value[i] = np.nan
@@ -203,7 +201,6 @@ def FitModel(starname,
         inparams=[]
 
     start_time = time.time()
-    print(f"Fitting {starname}")
 
     fitmod, result = FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=inparams, fitmod_Opt=fitmod_Opt)
     seconds = time.time() - start_time
@@ -239,7 +236,7 @@ def FitModel(starname,
     if mcmc:
         mcmc_nsteps = int(inparams["mcmc_nsteps"])
         fitmod = FitModel_mcmc(fitmod, reddened_star, modinfo, mcmc_nsteps, outname, outtype, savepath, print_process)
-        Save_params(fitmod.pprint_parameters(), starname, param_savepath, fit_type=f"mcmc_{fit_type}")
+        Save_params(fitmod, starname, param_savepath, fit_type=f"mcmc_{fit_type}")
     elif mcmc!=None and param_savepath != None:
         Save_params(fitmod, starname, param_savepath, fit_type=f"optimizer_{fit_type}")
 
@@ -312,24 +309,32 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
         memod.logTeff.bounds = (memod.logTeff.bounds[0], inparams["logTeff"]+0.05)
     if "logg" in inparams:
         memod.logg.value = inparams["logg"]
+        if starname == "als882": memod.logg.bounds = (memod.logg.bounds[0], 4.2)
+        if starname == "hd303313": memod.logg.bounds = (memod.logg.bounds[0], 4.00)
     if "logZ" in inparams:
         memod.logZ.value = inparams["logZ"]
     if "vturb" in inparams:
         memod.vturb.value = inparams["vturb"]
+#        if starname == "hd204827": memod.vturb.bounds = (memod.vturb.bounds[0], 7.47)
     if "velocity" in inparams:
         memod.velocity.value = inparams["velocity"]
+        #memod.velocity.bounds = (-1.0, 1.0)
     if "windamp" in inparams:
         memod.windamp.value = inparams["windamp"]
     if "windalpha" in inparams:
         memod.windalpha.value = inparams["windalpha"]
-    memod.velocity.bounds = (-250, 250)
+    if starname == "als6028":
+        memod.velocity.bounds = (-20, 20)
+    else:   
+        memod.velocity.bounds = (-250, 250)
 
     # dust - values, bounds, and priors based on VCG04 and FM07 MW samples (expect Av)
     if "Av" in inparams:
         memod.Av.value = inparams["Av"]
+#    if starname == "als18098": memod.Av.bounds = (2.0, memod.Av.bounds[1])
     if "Rv" in inparams:
         memod.Rv.value = inparams["Rv"]
-    if "C2" in inparams:
+    if "C2" in inparams: 
         memod.C2.value = inparams["C2"]
     if "B3" in inparams:
         memod.B3.value = inparams["B3"]
@@ -348,6 +353,7 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     if "logHI_MW" in inparams:
         memod.logHI_MW.value = inparams["logHI_MW"]
         if starname == "hd210121": memod.logHI_MW.bounds = ( memod.logHI_MW.bounds[0], inparams["logHI_MW"]+0.5)
+        memod.logHI_MW.bounds = (20.0, memod.logHI_MW.bounds[1])
     if "vel_exgal" in inparams:
         memod.vel_exgal.value = inparams["vel_exgal"]
     if "logHI_exgal" in inparams:
@@ -370,9 +376,12 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     if "STIS" in reddened_star.data.keys() or "IUE" in reddened_star.data.keys():
         memod.logTeff.fixed = True
         memod.logg.fixed = True
-        if starname == "hd210121": memod.Av.prior = (memod.Av.value, 1e-5)
-        if starname == "hd210121": memod.xo.prior = (memod.xo.value, 1e-4)
-        if starname == "hd210121": memod.vturb.fixed = True
+        if starname == "hd192660":
+            memod.Av.prior = (memod.Av.value, 1e-5)
+        if starname == "hd210121": 
+            memod.Av.prior = (memod.Av.value, 1e-5)
+            memod.xo.prior = (memod.xo.value, 1e-4)
+            memod.vturb.fixed = (memod.vturb.value, 1e-5)
         if starname == "hd37021": memod.xo.prior = (memod.xo.value, 1e-4)
         memod.C2.fixed = False
         memod.B3.fixed = False
@@ -539,15 +548,16 @@ def create_ext_curve(starname,
     extdata.save(save_file, column_info=col_info)
     print(f"File written to: {save_file}")
 
-    ext_fit_plot(extdata, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
-    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
+    plot_ext(extdata, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
+#    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
 
     plt.savefig(f"{savepath}/{starname}_ext_fit.png")
-    plt.show()
+#    plt.show()
+
 
 if __name__ == "__main__":
 
-    starname = "hd303313"
+    starname = "hd93160"
 
     path = "/Users/cgunasekera/extstar_data/DAT_files"
     modpath="/Users/cgunasekera/extstar_data/Models"
@@ -561,20 +571,23 @@ if __name__ == "__main__":
              reddened_star,
              modinfo,
              path,
-             showfit=False, savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
+             showfit=True, 
+             savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
              inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat",
-#             mcmc=run_mcmc,
+#             mcmc=True,
              )
 #    exit(0)
     fstarname = f"{starname}.dat"
     reddened_star = StarData(fstarname, path=f"{path}", only_bands=[], only_data="ALL")
     modinfo = get_modeldata(reddened_star, modpath=modpath)
 
+#    fitmod = fitmod_Opt
     fitmod = FitModel(starname,
              reddened_star,
              modinfo,
              path,
-             showfit=False, savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
+             showfit=True, 
+             savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
              inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat",
              fitmod_Opt=fitmod_Opt,
              mcmc=True,
