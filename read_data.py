@@ -3,6 +3,7 @@ import glob
 import re
 from measure_extinction.stardata import StarData
 from measure_extinction.modeldata import ModelData
+import numpy as np
 
 def DATstarname(starname):
     if starname.startswith("hd") and len(re.split(r'(\d+)', starname)[1]) < 6:
@@ -63,6 +64,13 @@ def get_mask(reddened_star_column, invert = False):
     
     return mask
 
+def get_fit_band():
+    return fit_band    
+
+
+
+fit_band = "J"
+
 if __name__ == "__main__":
     file_path = "/Users/cgunasekera/extstar_data/"
     starname = "hd18352"
@@ -83,6 +91,7 @@ if __name__ == "__main__":
 
     fake_dict = {"BAND":-1, "STIS_Opt":-1}
     data_names = fake_dict.keys()
+    get_fit_band()
     modinfo = get_model_data(file_path, data_names, logTeff=params[0], logg=params[1],
-                             band_names="J")
+                             band_names=get_fit_band())
 

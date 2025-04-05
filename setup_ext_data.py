@@ -96,7 +96,7 @@ def AddDatSTISpath(starname, waveregion, outpath, sample_summary):
          datfile.writelines(f)
 
 def mrg2fits(starname, inpath, outpath, waveregion="Opt", outstarname=None):
-    os.chdir('/Users/cgunasekera/forked_measure_extinction/measure_extinction/utils/')
+    os.chdir('/Users/cgunasekera/measure_extinction/measure_extinction/utils/')
 
     # Running the command line command:
     # python3 merge_stis_spec.py --ralph --inpath=[inpath] --outpath=[outpath] [starname]
@@ -107,6 +107,7 @@ def mrg2fits(starname, inpath, outpath, waveregion="Opt", outstarname=None):
     if outstarname != None: command_args.append('--outname='+outstarname)
     command_args.append('--waveregion='+waveregion)
     command_args.append(starname)
+    print(command_args)
     subprocess.run(command_args)
     if outstarname != None: starname = outstarname
     print(starname, f"Merged data to create {starname}_stis_{waveregion}.fits")
@@ -114,7 +115,7 @@ def mrg2fits(starname, inpath, outpath, waveregion="Opt", outstarname=None):
     starname = starname.split("_")[0]
 
     #Search and add stis data file path to .dat file
-    AddDatSTISpath(starname, waveregion, outpath, sample_summary=data_set)
+#    AddDatSTISpath(starname, waveregion, outpath, sample_summary=data_set)
 
 def get_f19starname(starname):
     if starname.startswith('hd'):
@@ -185,24 +186,79 @@ def get_stars_list(file_path, data_set, starname_col = 0):
         stars_list.append(starname)
     
     return stars_list
-    
 
-############################################
-######       GLOBAL VARIABLES       ########
-############################################
 
-file_path = "/Users/cgunasekera/extstar_data/"
-data_set = "F19"
-# OPTIONS:
-#   "F19"
-#   "HighLowRv"
+def prep_obs_data(data_set, file_path, inpath, outpath):
+    stars_list = []
+    program_stars_list = get_stars_list(file_path=file_path, data_set=data_set)
 
-inpath = f"{file_path}DAT_files/STIS_Data/F19_Orig/Opt/" #location of original reduced data, *.mrg files
-# OPTIONS:
-#   F19 STIS:   "DAT_files/STIS_Data/F19_Orig/Opt/"
-#   HighLowRv:  "DAT_files/STIS_Data/HighLowRv_Orig/"
+#    i=0
+#    for (current_dir, dirs, files) in os.walk(inpath, topdown = 'true'):
+#        for file in files:
+#            starname = file.split('.')[0]
+#            if data_set == "F19" and file.endswith(".mrg") and starname in program_stars_list:# and starname not in not_tlusty:
+#                    stars_list.append(starname)
+#            elif data_set == "HighLowRv" and file.endswith(".fits"):# and starname in program_stars_list:
+#                stars_list.append(starname)
+#
+#    print(len(stars_list)," stars found.")
+#    missing_data_stars = [star for star in program_stars_list if star not in stars_list]
+#    #print("Missing data for stars:", missing_data_stars)
+#
+#    if data_set == "F19":
+#        for starname in stars_list:
+#            #if not starname == "hd210121":
+#            #    continue
+#            print("Creating STIS .fits file for ", starname)
+#            mrg2fits(starname, inpath, outpath)
+#            i+=1
+#    
+#    elif data_set == "HighLowRv":
+    outstarname = program_stars_list #get_stars_list(file_path=file_path, data_set=data_set, starname_col=1)
+    for (current_dir, dirs, files) in os.walk(inpath, topdown = 'true'):
+        i=0
+        merged_stars = []
+        if current_dir != inpath:
+            continue
+        for file in files:
+            if file.endswith(".fits") and file[:6] not in merged_stars:
+                merged_stars.append(file[:6])
+                hdul = fits.open(inpath+file)
+                starname = hdul[0].header["TARGNAME"]
+                file_name = file.split("_")[0]
 
-outpath = f"{file_path}DAT_files/STIS_Data/" #location of files to output, *.fits files
+                if not starname == "HD200775": #starname.endswith("37023"):
+                    continue
+
+                optical_element = hdul[0].header["OPT_ELEM"]
+
+                wave_region = ""
+                if optical_element == "G750L" or optical_element == "G430L":
+                    wave_region = "Opt"
+                else:
+                    wave_region == "UV"
+
+                if starname.startswith("HD"):
+                    starname = "HD"+starname[2:]
+                    print(starname)
+                if starname.lower() in program_stars_list:
+                    index = [idx for idx,s in enumerate(program_stars_list) if s == starname.lower()][0]
+                    print("DOING THIS 1")
+                    suffix1 = file.split(".")[0].split("_")[-1]
+                    suffix2 = file.split("_")[0].split("j")[-1]
+                    mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname=f"{outstarname[index]}")
+                    mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname=f"{outstarname[index]}")
+                    i+=1
+                elif starname.lower() == "ngc2264-vas47":
+                    mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="walker67")
+                    mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="walker67")
+                    i+=1
+                elif starname.lower() == "hd200775":# or starname.lower() == "ngc2264-vas47":
+                    #mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="hd200775")
+                    mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="hd200775")
+                    i+=1
+
+    print(f"{i} stars fits files done.")
 
 
 ###########################################
@@ -210,69 +266,27 @@ outpath = f"{file_path}DAT_files/STIS_Data/" #location of files to output, *.fit
 ###########################################
 
 if __name__ == "__main__":
-    stars_list = []
-    program_stars_list = get_stars_list(file_path=file_path, data_set=data_set)
 
-    i=0
-    for (current_dir, dirs, files) in os.walk(inpath, topdown = 'true'):
-        for file in files:
-            starname = file.split('.')[0]
-            if data_set == "F19" and file.endswith(".mrg") and starname in program_stars_list:# and starname not in not_tlusty:
-                    stars_list.append(starname)
-            elif data_set == "HighLowRv" and file.endswith(".fits"):# and starname in program_stars_list:
-                stars_list.append(starname)
+    file_path = "/Users/cgunasekera/extstar_data/"
+    data_set = "HighLowRv"
+    # OPTIONS:
+    #   "F19"
+    #   "HighLowRv"
 
-    print(len(stars_list)," stars found.")
-    missing_data_stars = [star for star in program_stars_list if star not in stars_list]
-    #print("Missing data for stars:", missing_data_stars)
+    inpath = f"{file_path}DAT_files/STIS_Data/HighLowRv_Orig/" #location of original reduced data, *.mrg files
+    # OPTIONS:
+    #   F19 STIS:   "DAT_files/STIS_Data/F19_Orig/Opt/"
+    #   HighLowRv:  "DAT_files/STIS_Data/HighLowRv_Orig/"
 
-    if data_set == "F19":
-        for starname in stars_list:
-            #if not starname == "hd210121":
-            #    continue
-            print("Creating STIS .fits file for ", starname)
-            mrg2fits(starname, inpath, outpath)
-            i+=1
-    
-    elif data_set == "HighLowRv":
-        outstarname = get_stars_list(file_path=file_path, data_set=data_set, starname_col=1)
-        for (current_dir, dirs, files) in os.walk(inpath, topdown = 'true'):
-            i=0
-            merged_stars = []
-            if current_dir != inpath:
-                continue
-            for file in files:
-                if file.endswith(".fits") and file[:6] not in merged_stars:
-                    merged_stars.append(file[:6])
-                    hdul = fits.open(inpath+file)
-                    starname = hdul[0].header["TARGNAME"]
-                    file_name = file.split("_")[0]
+    outpath = f"{file_path}DAT_files/STIS_Data/" #location of files to output, *.fits files
 
-                    if not starname == "ALS882": #starname.endswith("37023"):
-                        continue
+    #parser = argparse.ArgumentParser(description="Run merge_stis_spec on set of data, and add .fits path to .dat file.")
+    #parser.add_argument('file_path', type=str, default=None, help="")
+    #parser.add_argument('data_set', type=str, help=".")
+    #parser.add_argument('--inpath', type=str, default=None, help="")
+    #parser.add_argument('--outpath', type=str, default=None, help="")
 
-                    optical_element = hdul[0].header["OPT_ELEM"]
+    #args = parser.parse_args()
 
-                    wave_region = ""
-                    if optical_element == "G750L" or optical_element == "G430L":
-                        wave_region = "Opt"
-                    else:
-                        wave_region == "UV"
-
-                    if starname.lower() in program_stars_list:
-                        index = [idx for idx,s in enumerate(program_stars_list) if s == starname.lower()][0]
-                        suffix1 = file.split(".")[0].split("_")[-1]
-                        suffix2 = file.split("_")[0].split("j")[-1]
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname=f"{outstarname[index]}")
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname=f"{outstarname[index]}")
-                        i+=1
-                    elif starname.lower() == "ngc2264-vas47":
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="walker67")
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="walker67")
-                        i+=1
-                    elif starname.lower() == "hd200775":# or starname.lower() == "ngc2264-vas47":
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="UV", outstarname="hd200775")
-                        mrg2fits(file_name[:6], inpath, outpath, waveregion="Opt", outstarname="hd200775")
-                        i+=1
-
-    print(f"{i} stars fits files done.")
+    #prep_obs_data(args.data_set, args.file_path, args.inpath, args.outpath)
+    prep_obs_data(data_set, file_path, inpath, outpath)
