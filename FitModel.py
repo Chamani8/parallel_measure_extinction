@@ -195,7 +195,7 @@ def FitModel(starname,
                     reddened_star.data[cspec].fluxes.value[i] = np.nan
 
     if inparam_file!=None:
-        inparams=read_inparams(starname, path, inparam_file)
+        inparams=read_inparams(starname, inparam_file)
         if print_process: print("Read initial parameters from file")
     else:
         inparams=[]
@@ -283,6 +283,7 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
         memod.add_exclude_region([1/1.024, 1/0.9915]/u.micron)
     if starname=="als18098":
         memod.add_exclude_region([1/0.2975, 1/0.28945]/u.micron)
+        memod.add_exclude_region([1/0.36, 1/0.35785]/u.micron)
     if starname=="gsc04023-00972":
         memod.add_exclude_region([1/0.124, 1/0.114458]/u.micron)
 
@@ -474,7 +475,7 @@ def FitModel_mcmc(fitmod,
         return fitmod2
 
 
-def read_inparams(starname, inparam_filepath, inparam_file):
+def read_inparams(starname, inparam_file):
     inparam_file = glob.glob(inparam_file)
     if inparam_file == []:
         print("Oops, couldn't find inparams file, using default.")
@@ -514,8 +515,8 @@ def create_ext_curve(starname,
         savepath,
         fitmod,
         modtype="obsstars",
-        relband=0.55*u.micron):
-
+        relband="V"): # 0.55*u.micron):
+    #TODO: use data types that match what is in fitmod
     reddened_star = StarData(f"{starname}.dat", path=f"{path}")#, only_data=["IUE", "STIS_Opt"])
 
     data_names = list(reddened_star.data.keys())
@@ -542,6 +543,7 @@ def create_ext_curve(starname,
         extdata.calc_AV_JHK()
     if "RV" not in extdata.columns.keys():
         extdata.calc_RV()
+
     RV = extdata.columns["RV"]
     AV = extdata.columns["AV"]
     col_info = {"av": AV[0], "rv": RV[0]}
@@ -557,11 +559,28 @@ def create_ext_curve(starname,
 
 if __name__ == "__main__":
 
-    starname = "hd93160"
+    parser = argparse.ArgumentParser(description="A simple command-line argument parser.")
+    parser.add_argument('-s', '--starname', type=str, help="Target name", default=None)
+    parser.add_argument('-p', '--datpath', type=str, help=".dat file location", default=".")
+    parser.add_argument('-m', '--modpath', type=str, help=".dat file location", default="../Models/")
+    parser.add_argument('-v', '--savepath', type=str, help=".dat file location", default=".")
+    parser.add_argument('-i', '--inparam', type=str, help=".dat file location", default=None)
 
-    path = "/Users/cgunasekera/extstar_data/DAT_files"
-    modpath="/Users/cgunasekera/extstar_data/Models"
-    
+    args = parser.parse_args()
+
+    if args.starname == None:
+        starname = "walker67"
+        path = "/Users/cgunasekera/extstar_data/DAT_files"
+        modpath = "/Users/cgunasekera/extstar_data/Models"
+        savepath = "/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
+        inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
+    else:
+        starname = args.starname
+        path = args.datpath
+        modpath = args.modpath
+        savepath = args.savepath
+        inparam_file = args.inparam
+
     fstarname = f"{starname}.dat"
     print(f"Fitting & measuring extinction of {starname}")
     reddened_star = StarData(fstarname, path=f"{path}", only_bands=[], only_data=["STIS_Opt"])
@@ -572,8 +591,8 @@ if __name__ == "__main__":
              modinfo,
              path,
              showfit=True, 
-             savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
-             inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat",
+             savepath=savepath,
+             inparam_file=inparam_file,
 #             mcmc=True,
              )
 #    exit(0)
@@ -581,21 +600,21 @@ if __name__ == "__main__":
     reddened_star = StarData(fstarname, path=f"{path}", only_bands=[], only_data="ALL")
     modinfo = get_modeldata(reddened_star, modpath=modpath)
 
-#    fitmod = fitmod_Opt
+    #fitmod = fitmod_Opt
     fitmod = FitModel(starname,
              reddened_star,
              modinfo,
              path,
              showfit=True, 
-             savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
-             inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat",
+             savepath=savepath,
+             inparam_file=inparam_file,
              fitmod_Opt=fitmod_Opt,
-             mcmc=True,
+#             mcmc=True,
              )
 #    exit(0)
     create_ext_curve(starname,
                      path,
-                     modpath="/Users/cgunasekera/extstar_data/Models",
-                     savepath="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots",
+                     modpath=modpath,
+                     savepath=savepath,
                      fitmod=fitmod
                      )
