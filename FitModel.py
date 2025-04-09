@@ -13,7 +13,7 @@ from measure_extinction.modeldata import ModelData
 from measure_extinction.model import MEModel
 from measure_extinction.extdata import ExtData
 
-from setup_ext_data import get_stars_list
+#from setup_ext_data import get_stars_list
 
 from plot_extinction_curves import plot_ext
 
@@ -110,7 +110,7 @@ def Save_params(fitmod, starname, save_path, fit_type):
 def FitModel(starname,
          reddened_star,
          modinfo,
-         path, #Path to star data
+         datpath, #Path to star data
          modtype="obsstars", #Pick the type of model grid; choices "obstars", "whitedwarfs"
          wind=False, #add IR (lambda > 1 um) wind emission model
          mcmc=False, #run EMCEE MCMC fitting
@@ -125,7 +125,7 @@ def FitModel(starname,
 
     if savepath == None:
         param_savepath = None
-        savepath=path
+        savepath=datpath
     else:
         #to edit later; this specifically only works for 'path/to/save/.../plots/'
         param_savepath = savepath[:-5]
@@ -307,40 +307,31 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     if "logTeff" in inparams:
         memod.logTeff.value = inparams["logTeff"]
     if "logTeff_bound" in inparams and inparams["logTeff_bound"]==True:
-        memod.logTeff.bounds = (memod.logTeff.bounds[0], inparams["logTeff"]+0.05)
+        memod.logTeff.bounds = (inparams["logTeff"]-0.1, inparams["logTeff"]+0.1)
     if "logg" in inparams:
         memod.logg.value = inparams["logg"]
-        if starname == "als882": memod.logg.bounds = (memod.logg.bounds[0], 4.2)
-        if starname == "hd303313": memod.logg.bounds = (memod.logg.bounds[0], 4.00)
+    memod.logg.bounds = (inparams["logg"]-0.1, inparams["logg"]+0.1)
     if "logZ" in inparams:
         memod.logZ.value = inparams["logZ"]
     if "vturb" in inparams:
         memod.vturb.value = inparams["vturb"]
-#        if starname == "hd204827": memod.vturb.bounds = (memod.vturb.bounds[0], 7.47)
     if "velocity" in inparams:
         memod.velocity.value = inparams["velocity"]
-        #memod.velocity.bounds = (-1.0, 1.0)
     if "windamp" in inparams:
         memod.windamp.value = inparams["windamp"]
     if "windalpha" in inparams:
         memod.windalpha.value = inparams["windalpha"]
-    if starname == "als6028":
-        memod.velocity.bounds = (-20, 20)
-    else:   
-        memod.velocity.bounds = (-250, 250)
 
     # dust - values, bounds, and priors based on VCG04 and FM07 MW samples (expect Av)
     if "Av" in inparams:
         memod.Av.value = inparams["Av"]
-#    if starname == "als18098": memod.Av.bounds = (2.0, memod.Av.bounds[1])
     if "Rv" in inparams:
         memod.Rv.value = inparams["Rv"]
+        memod.Rv.bounds = (2.0, 8.0)
     if "C2" in inparams: 
         memod.C2.value = inparams["C2"]
     if "B3" in inparams:
         memod.B3.value = inparams["B3"]
-        if starname == "hd210121": memod.B3.bounds = (0.0, inparams["B3"]+0.5)
-        if starname == "hd37021": memod.B3.bounds = (memod.B3.bounds[0], 1.6)
     if "C4" in inparams:
         memod.C4.value = inparams["C4"]
     if "xo" in inparams:
@@ -352,8 +343,7 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     if "vel_MW" in inparams:
         memod.vel_MW.value = inparams["vel_MW"]
     if "logHI_MW" in inparams:
-        memod.logHI_MW.value = inparams["logHI_MW"]
-        if starname == "hd210121": memod.logHI_MW.bounds = ( memod.logHI_MW.bounds[0], inparams["logHI_MW"]+0.5)
+        memod.logHI_exgal.value = np.log10(1.61e21 * memod.Av.value)
         memod.logHI_MW.bounds = (20.0, memod.logHI_MW.bounds[1])
     if "vel_exgal" in inparams:
         memod.vel_exgal.value = inparams["vel_exgal"]
@@ -373,17 +363,9 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     #memod.Av.fixed = True
     #memod.Rv.fixed = False
 
-
     if "STIS" in reddened_star.data.keys() or "IUE" in reddened_star.data.keys():
         memod.logTeff.fixed = True
         memod.logg.fixed = True
-        if starname == "hd192660":
-            memod.Av.prior = (memod.Av.value, 1e-5)
-        if starname == "hd210121": 
-            memod.Av.prior = (memod.Av.value, 1e-5)
-            memod.xo.prior = (memod.xo.value, 1e-4)
-            memod.vturb.fixed = (memod.vturb.value, 1e-5)
-        if starname == "hd37021": memod.xo.prior = (memod.xo.value, 1e-4)
         memod.C2.fixed = False
         memod.B3.fixed = False
         memod.C4.fixed = False
@@ -510,14 +492,14 @@ def read_inparams(starname, inparam_file):
 
 
 def create_ext_curve(starname,
-        path,
+        datpath,
         modpath,
         savepath,
         fitmod,
         modtype="obsstars",
         relband="V"): # 0.55*u.micron):
     #TODO: use data types that match what is in fitmod
-    reddened_star = StarData(f"{starname}.dat", path=f"{path}")#, only_data=["IUE", "STIS_Opt"])
+    reddened_star = StarData(f"{starname}.dat", path=datpath, only_data=["STIS_Opt"])
 
     data_names = list(reddened_star.data.keys())
     band_names = reddened_star.data["BAND"].get_band_names()
@@ -546,6 +528,7 @@ def create_ext_curve(starname,
 
     RV = extdata.columns["RV"]
     AV = extdata.columns["AV"]
+    EBV = extdata.columns["EBV"]
     col_info = {"av": AV[0], "rv": RV[0]}
     extdata.save(save_file, column_info=col_info)
     print(f"File written to: {save_file}")
@@ -553,8 +536,8 @@ def create_ext_curve(starname,
     plot_ext(extdata, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
 #    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
 
-    plt.savefig(f"{savepath}/{starname}_ext_fit.png")
-#    plt.show()
+#    plt.savefig(f"{savepath}/{starname}_ext_fit.png")
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -570,26 +553,26 @@ if __name__ == "__main__":
 
     if args.starname == None:
         starname = "walker67"
-        path = "/Users/cgunasekera/extstar_data/DAT_files"
+        datpath = "/Users/cgunasekera/extstar_data/DAT_files"
         modpath = "/Users/cgunasekera/extstar_data/Models"
         savepath = "/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
         inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
     else:
         starname = args.starname
-        path = args.datpath
+        datpath = args.datpath
         modpath = args.modpath
         savepath = args.savepath
         inparam_file = args.inparam
 
     fstarname = f"{starname}.dat"
     print(f"Fitting & measuring extinction of {starname}")
-    reddened_star = StarData(fstarname, path=f"{path}", only_bands=[], only_data=["STIS_Opt"])
+    reddened_star = StarData(fstarname, path=datpath, only_bands=[], only_data=["STIS_Opt"])
     modinfo = get_modeldata(reddened_star, modpath=modpath)
 
     fitmod_Opt = FitModel(starname, #args.starname.lower(),
              reddened_star,
              modinfo,
-             path,
+             datpath,
              showfit=True, 
              savepath=savepath,
              inparam_file=inparam_file,
@@ -597,14 +580,14 @@ if __name__ == "__main__":
              )
 #    exit(0)
     fstarname = f"{starname}.dat"
-    reddened_star = StarData(fstarname, path=f"{path}", only_bands=[], only_data="ALL")
+    reddened_star = StarData(fstarname, path=datpath, only_bands=[], only_data="ALL")
     modinfo = get_modeldata(reddened_star, modpath=modpath)
 
     #fitmod = fitmod_Opt
     fitmod = FitModel(starname,
              reddened_star,
              modinfo,
-             path,
+             datpath,
              showfit=True, 
              savepath=savepath,
              inparam_file=inparam_file,
@@ -613,7 +596,7 @@ if __name__ == "__main__":
              )
 #    exit(0)
     create_ext_curve(starname,
-                     path,
+                     datpath,
                      modpath=modpath,
                      savepath=savepath,
                      fitmod=fitmod
