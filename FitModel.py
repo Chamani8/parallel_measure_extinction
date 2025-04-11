@@ -147,53 +147,6 @@ def FitModel(starname,
         elif cspec == "STIS_Opt" or cspec == "IUE":
             allowed_dev = 0.3
 
-#        plt.scatter(reddened_star.data[cspec].waves, reddened_star.data[cspec].fluxes, color="black")
-        for i,val in enumerate(reddened_star.data[cspec].fluxes.value):
-            if i+1 >= len(reddened_star.data[cspec].fluxes.value):
-                continue
-            if abs(val - reddened_star.data[cspec].fluxes[i-1].value)/val > allowed_dev and abs(val - reddened_star.data[cspec].fluxes[i+1].value)/val > allowed_dev:
-                reddened_star.data[cspec].fluxes.value[i] = np.nan
-
-            if starname=="bd+56-510":
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value<0.292:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "IUE" and reddened_star.data[cspec].waves[i].value>0.3153:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if reddened_star.data[cspec].waves[i].value>0.2186 and reddened_star.data[cspec].waves[i].value<0.2197:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname=="als18098":
-                if reddened_star.data[cspec].waves[i].value>0.18092 and reddened_star.data[cspec].waves[i].value<0.18164:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if reddened_star.data[cspec].waves[i].value>0.20063 and reddened_star.data[cspec].waves[i].value<0.201981:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value<0.293912:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname=="hd036982":
-                if cspec == "STIS_Opt" and (reddened_star.data[cspec].waves[i].value<0.293516):# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "IUE" and reddened_star.data[cspec].waves[i].value>0.324:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname=="hd37021":
-                if cspec == "STIS_Opt" and (reddened_star.data[cspec].waves[i].value<0.295614):# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "IUE" and reddened_star.data[cspec].waves[i].value>0.316:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname == "hd038087":
-                if cspec == "IUE" and reddened_star.data[cspec].waves[i].value>0.315:
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname == "hd200775":
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value>0.65176 and reddened_star.data[cspec].waves[i].value<0.66173:# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value>0.48509 and reddened_star.data[cspec].waves[i].value<0.4872:# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value>0.84118 and reddened_star.data[cspec].waves[i].value<0.84823:# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-            if starname == "walker67":
-                if cspec == "IUE" and (reddened_star.data[cspec].waves[i].value>0.3305 or reddened_star.data[cspec].waves[i].value<0.1235):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-                if cspec == "STIS_Opt" and reddened_star.data[cspec].waves[i].value<0.2941:# or reddened_star.data[cspec].waves[i].value>1.01934):
-                    reddened_star.data[cspec].fluxes.value[i] = np.nan
-
     if inparam_file!=None:
         inparams=read_inparams(starname, inparam_file)
         if print_process: print("Read initial parameters from file")
@@ -274,6 +227,9 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
         memod.velocity.value = float(reddened_star.model_params["velocity"])
         memod.velocity.fixed = True
 
+
+    if starname=="bd+56-510":
+        memod.add_exclude_region([1/0.292, 1/0.2891]/u.micron)
 #    if starname=="hd200775":
 #        memod.add_exclude_region([1/0.667082, 1/0.647051]/u.micron)
     if starname=="hd164906":
@@ -286,6 +242,15 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
         memod.add_exclude_region([1/0.36, 1/0.35785]/u.micron)
     if starname=="gsc04023-00972":
         memod.add_exclude_region([1/0.124, 1/0.114458]/u.micron)
+    if starname=="hd036982":
+        memod.add_exclude_region([1/1.02298, 1/1.01431]/u.micron)
+        memod.add_exclude_region([1/0.296247, 1/0.290343]/u.micron)
+    if starname=="hd37021":
+        memod.add_exclude_region([1/0.295788, 1/0.28914]/u.micron)
+    if starname == "hd038087":
+        memod.add_exclude_region([1/0.20101, 1/0.200573]/u.micron)
+        memod.add_exclude_region([1/0.206101, 1/0.205451]/u.micron)
+        memod.add_exclude_region([1/0.199557, 1/0.198949]/u.micron)
 
     memod.fit_weights(reddened_star)
 
@@ -307,10 +272,11 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     if "logTeff" in inparams:
         memod.logTeff.value = inparams["logTeff"]
     if "logTeff_bound" in inparams and inparams["logTeff_bound"]==True:
-        memod.logTeff.bounds = (inparams["logTeff"]-0.1, inparams["logTeff"]+0.1)
+        memod.logTeff.bounds = (memod.logTeff.bounds[0], inparams["logTeff"]+0.05)
+        #memod.logTeff.bounds = (inparams["logTeff"]-0.1, inparams["logTeff"]+0.1)
     if "logg" in inparams:
         memod.logg.value = inparams["logg"]
-    memod.logg.bounds = (inparams["logg"]-0.1, inparams["logg"]+0.1)
+    #memod.logg.bounds = (inparams["logg"]-0.1, inparams["logg"]+0.1)
     if "logZ" in inparams:
         memod.logZ.value = inparams["logZ"]
     if "vturb" in inparams:
@@ -342,9 +308,9 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
     # gas
     if "vel_MW" in inparams:
         memod.vel_MW.value = inparams["vel_MW"]
-    if "logHI_MW" in inparams:
-        memod.logHI_exgal.value = np.log10(1.61e21 * memod.Av.value)
-        memod.logHI_MW.bounds = (20.0, memod.logHI_MW.bounds[1])
+    #if "logHI_MW" in inparams:
+    memod.logHI_MW.value = np.log10(1.61e21 * memod.Av.value)
+    memod.logHI_MW.bounds = (memod.logHI_MW.value-1.0, memod.logHI_MW.value+1.0)
     if "vel_exgal" in inparams:
         memod.vel_exgal.value = inparams["vel_exgal"]
     if "logHI_exgal" in inparams:
@@ -525,14 +491,18 @@ def create_ext_curve(starname,
         extdata.calc_AV_JHK()
     if "RV" not in extdata.columns.keys():
         extdata.calc_RV()
+    if "EBV" not in extdata.columns.keys():
+        extdata.calc_EBV()
 
     RV = extdata.columns["RV"]
     AV = extdata.columns["AV"]
     EBV = extdata.columns["EBV"]
-    col_info = {"av": AV[0], "rv": RV[0]}
+    col_info = {"av": AV[0], "rv": RV[0]} #TODO: include ebv here?
     extdata.save(save_file, column_info=col_info)
     print(f"File written to: {save_file}")
 
+    print(f"AV = {AV[0]}+/-{AV[1]}")
+    #print(f"EBV = {EBV[0]}+/-{EBV[1]}")
     plot_ext(extdata, plot_title=f"{starname}, Rv = {RV[0]}+/-{RV[1]}")
 #    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
 
@@ -552,11 +522,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.starname == None:
-        starname = "walker67"
-        datpath = "/Users/cgunasekera/extstar_data/DAT_files"
-        modpath = "/Users/cgunasekera/extstar_data/Models"
-        savepath = "/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
-        inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
+        starname = "hd038087"
+        datpath = "/Home/extstar_data/DAT_files"
+        modpath = "/Home/Models"
+        savepath = "/Home/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
+        inparam_file="/Home/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
     else:
         starname = args.starname
         datpath = args.datpath
