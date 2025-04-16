@@ -17,6 +17,57 @@ from measure_extinction.extdata import ExtData
 
 from plot_extinction_curves import plot_ext
 
+def adj_Teff_spec(spectral_type):
+    romans = ['I', 'V', 'X']
+    index2 = next((i for i, char in enumerate(spectral_type) if char in romans), -1)
+    index3 = next((i for i, char in enumerate(spectral_type[index2:]) if char not in romans), -1)+index2
+    spec_letter = spectral_type[0]
+    spec_num = spectral_type[1:index2]
+    spec_rom = spectral_type[index2:]
+    spec_order = ["O", "B", "A", "F", "G", "K", "M", "L"]
+    index = spec_order.index(spec_letter)
+
+    if spectral_type[index2:index3] != "I":
+        specn = float(spec_num)-1
+        upper_spec = f"{spec_letter}{int(specn)}{spec_rom}"
+        specn = float(spec_num)+1
+        lower_spec = f"{spec_letter}{int(specn)}{spec_rom}"
+
+        if spec_num == "0":
+            upper_spec = spec_order[index - 1] if index > 0 else None
+            upper_spec = f"{upper_spec}9{spec_rom}"
+        elif spec_num == "9":
+            lower_spec = spec_order[index + 1] if index < len(spec_order) - 1 else None
+            lower_spec = f"{lower_spec}0{spec_rom}"
+    else:
+        specn = float(spec_num)-1
+        upper_spec = f"{spec_letter}{int(specn)}VI"
+        specn = float(spec_num)+1
+        lower_spec = f"{spec_letter}{spec_num}II"
+
+        if spec_num == "0":
+            upper_spec = spec_order[index - 1] if index > 0 else None
+            upper_spec = f"{upper_spec}9VI"
+
+    return upper_spec, lower_spec
+
+def spectral_stddev(star_spectral_type):
+    upper_spec, lower_spec = adj_Teff_spec(star_spectral_type)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    temps = []
+    specs = []
+    with open(f"{script_dir}/stellar_classification_table.dat", "r") as spec_table:
+        for spec_dat in spec_table:
+            spec_type = spec_dat.split()[0]
+            if spec_type == upper_spec or spec_type == star_spectral_type or spec_type == lower_spec:
+                specs.append(spec_type)
+                temps.append(float(spec_dat.split()[4]))
+
+    #NEXT TODO: do same for getting adjecent logg values
+    print(specs)
+    print(temps)
+            #print(spec_type)
+
 def get_modeldata(reddened_star,
          modtype="obsstars",
          modpath="./", #path to the model files
@@ -107,6 +158,7 @@ def Save_params(fitmod, starname, save_path, fit_type):
             f.write(ptxt)
     f.close()
 
+
 def FitModel(starname,
          reddened_star,
          modinfo,
@@ -156,6 +208,7 @@ def FitModel(starname,
     start_time = time.time()
 
     fitmod, result = FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=inparams, fitmod_Opt=fitmod_Opt)
+
     seconds = time.time() - start_time
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -293,7 +346,7 @@ def FitModel_opt(reddened_star, modinfo, modtype, wind, print_process, inparams=
         memod.Av.value = inparams["Av"]
     if "Rv" in inparams:
         memod.Rv.value = inparams["Rv"]
-        memod.Rv.bounds = (2.0, 8.0)
+        memod.Rv.bounds = (1.0, 8.0)
     if "C2" in inparams: 
         memod.C2.value = inparams["C2"]
     if "B3" in inparams:
@@ -448,7 +501,7 @@ def read_inparams(starname, inparam_file):
         if param == "True": initial_params[paramname]= True
         elif param == "False": initial_params[paramname]= False
         else:
-            initial_params[paramname]= float(param)
+            initial_params[paramname] = float(param)
 
     if len(initial_params) == 1:
         print("Incorrect value found for initial params. Using default set.")
@@ -507,11 +560,9 @@ def create_ext_curve(starname,
 #    print(f"RV = {RV[0]}+/-{RV[1]}, AV = {AV[0]}+/-{AV[1]}")
 
 #    plt.savefig(f"{savepath}/{starname}_ext_fit.png")
-    plt.show()
+#    plt.show()
 
-
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description="A simple command-line argument parser.")
     parser.add_argument('-s', '--starname', type=str, help="Target name", default=None)
     parser.add_argument('-p', '--datpath', type=str, help=".dat file location", default=".")
@@ -522,11 +573,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.starname == None:
-        starname = "hd038087"
-        datpath = "/Home/extstar_data/DAT_files"
-        modpath = "/Home/Models"
-        savepath = "/Home/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
-        inparam_file="/Home/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
+        starname = "hd37021"
+        datpath = "/Users/cgunasekera/extstar_data/DAT_files"
+        modpath = "/Users/cgunasekera/extstar_data/Models"
+        savepath = "/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/plots"
+        inparam_file="/Users/cgunasekera/extstar_data/DAT_files/STIS_Data/fitting_results/HighLowRv/HighLowRv_inparams.dat"
     else:
         starname = args.starname
         datpath = args.datpath
@@ -548,7 +599,7 @@ if __name__ == "__main__":
              inparam_file=inparam_file,
 #             mcmc=True,
              )
-#    exit(0)
+#   return
     fstarname = f"{starname}.dat"
     reddened_star = StarData(fstarname, path=datpath, only_bands=[], only_data="ALL")
     modinfo = get_modeldata(reddened_star, modpath=modpath)
@@ -564,10 +615,13 @@ if __name__ == "__main__":
              fitmod_Opt=fitmod_Opt,
 #             mcmc=True,
              )
-#    exit(0)
+#   return
     create_ext_curve(starname,
                      datpath,
                      modpath=modpath,
                      savepath=savepath,
                      fitmod=fitmod
                      )
+
+if __name__ == "__main__":
+    main()
